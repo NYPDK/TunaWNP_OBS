@@ -1,0 +1,40 @@
+﻿<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8'>
+  <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+  <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+  <script src='./scripts/socket.js'></script>
+  <script defer src='./GlowCard.js'></script>
+  <link rel='stylesheet' href='./GlowCard.css'>
+</head>
+<body>
+  <div class="spark-card">
+    <div class="spark-card-frame"></div>   <!-- blurred card + shadow -->
+
+    <div class='cover-panel'>
+      <img id='cover' class='empty' />
+    </div>
+
+    <div class='info-stack'>
+      <div class='text-row title-row'>
+        <div class='scroll-inner'>
+          <span class='text-inner title' id='title'>N/A</span>
+          <span class='text-inner title clone' id='title-clone' aria-hidden='true'>N/A</span>
+        </div>
+      </div>
+      <div class='text-row artist-row'>
+        <div class='scroll-inner'>
+          <span class='text-inner artist' id='artist'>N/A</span>
+          <span class='text-inner artist clone' id='artist-clone' aria-hidden='true'>N/A</span>
+        </div>
+      </div>
+      <div class='progress-track'>
+        <div class='progress' id='progress'></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+
+
