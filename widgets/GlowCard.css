@@ -260,7 +260,7 @@ body {
 .progress {
   width: 0%;
   height: 100%;
-  background: color-mix(in srgb, var(--cover-avg-color) 60%, var(--cover-avg-brightness-color));
+  background: color-mix(in srgb, var(--cover-avg-color) 50%, var(--cover-avg-brightness-color));
   border-radius: inherit;
   transition: width 0.2s ease-out;
 }

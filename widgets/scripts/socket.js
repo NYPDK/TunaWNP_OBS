@@ -51,8 +51,10 @@ function registerSocket(_onMediaInfoChange) {
     ws.onerror = () => retry()
     ws.onmessage = (e) => {
       try {
-        const mediaInfo = JSON.parse(mapJsonKeys(e.data))
-        onMediaInfoChange(mediaInfo)
+        const mediaInfo = mapJsonKeys(e.data)
+        if (mediaInfo) {
+          onMediaInfoChange(mediaInfo)
+        }
       } catch {}
     }
   }
@@ -60,22 +62,50 @@ function registerSocket(_onMediaInfoChange) {
 
 // Maps keys from pywnp < 2.0.0 to pywnp > 2.0.0
 // Example: Player -> player_name
-function mapJsonKeys(jsonStr) {
-  return jsonStr
-    .replace('State', 'state')
-    .replace('player', 'player_name')
-    .replace('Title', 'title')
-    .replace('Artist', 'artist')
-    .replace('Album', 'album')
-    .replace('CoverUrl', 'cover_url')
-    .replace('Duration', 'duration')
-    .replace('DurationSeconds', 'duration_seconds')
-    .replace('Position', 'position')
-    .replace('PositionSeconds', 'position_seconds')
-    .replace('PositionPercent', 'position_percent')
-    .replace('Volume', 'volume')
-    .replace('Rating', 'rating')
-    .replace('RepeatState', 'repeat_mode')
-    .replace('Shuffle', 'shuffle_active')
-    .replace('Timestamp', 'timestamp')
+const LEGACY_KEY_MAP = {
+  State: 'state',
+  Player: 'player_name',
+  PlayerName: 'player_name',
+  player: 'player_name',
+  Title: 'title',
+  Artist: 'artist',
+  Album: 'album',
+  CoverUrl: 'cover_url',
+  Duration: 'duration',
+  DurationSeconds: 'duration_seconds',
+  Position: 'position',
+  PositionSeconds: 'position_seconds',
+  PositionPercent: 'position_percent',
+  Volume: 'volume',
+  Rating: 'rating',
+  RepeatState: 'repeat_mode',
+  Shuffle: 'shuffle_active',
+  ShuffleActive: 'shuffle_active',
+  Timestamp: 'timestamp'
+}
+
+function mapJsonKeys(payload) {
+  if (payload == null) {
+    return null
+  }
+
+  let data = payload
+  if (typeof payload === 'string') {
+    try {
+      data = JSON.parse(payload)
+    } catch {
+      return null
+    }
+  }
+
+  if (typeof data !== 'object' || data === null) {
+    return null
+  }
+
+  const normalized = {}
+  for (const [key, value] of Object.entries(data)) {
+    const mappedKey = LEGACY_KEY_MAP[key] || key
+    normalized[mappedKey] = value
+  }
+  return normalized
 }

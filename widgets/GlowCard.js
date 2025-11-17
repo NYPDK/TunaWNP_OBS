@@ -29,7 +29,6 @@
       ) {
         return false
       }
-      // Allow any other scheme and let the proxy validate it (e.g., file://).
       return true
     }
 
