@@ -68,9 +68,23 @@ last_tuna_track_id = None
 last_tuna_progress_sec = 0.0
 last_tuna_timestamp = 0.0
 
+_timer_cleanup_done = False
+_tuna_cleanup_done = False
+_palette_cleanup_done = False
+_wnp_cleanup_done = False
+_frontend_callback_registered = False
+
 SOURCE_KEY_ALIASES = {
     "Player": ["Player", "PlayerName"],
 }
+
+_widget_removed = False
+
+_OBS_FRONTEND_EVENT_EXIT = getattr(obs, "OBS_FRONTEND_EVENT_EXIT", None)
+_OBS_FRONTEND_EVENT_SHUTDOWN = getattr(obs, "OBS_FRONTEND_EVENT_SHUTDOWN", None)
+_OBS_FRONTEND_EXIT_EVENTS = tuple(
+    event for event in (_OBS_FRONTEND_EVENT_EXIT, _OBS_FRONTEND_EVENT_SHUTDOWN) if event is not None
+)
 
 
 class ThreadedPaletteProxy(ThreadingMixIn, HTTPServer):
@@ -147,10 +161,102 @@ def start_palette_proxy():
 def stop_palette_proxy():
     global palette_proxy_server, palette_proxy_thread
     if palette_proxy_server:
-        palette_proxy_server.shutdown()
-        palette_proxy_server.server_close()
+        try:
+            palette_proxy_server.shutdown()
+            palette_proxy_server.server_close()
+        except Exception as exc:
+            print(f"WNP_TUNA - WARN: error stopping palette proxy: {exc}")
     palette_proxy_server = None
+    if palette_proxy_thread and palette_proxy_thread.is_alive():
+        try:
+            palette_proxy_thread.join(timeout=2.0)
+        except Exception as exc:
+            print(f"WNP_TUNA - WARN: error joining palette proxy thread: {exc}")
+        if palette_proxy_thread.is_alive():
+            print("WNP_TUNA - WARN: palette proxy thread still alive after join")
     palette_proxy_thread = None
+
+
+def _on_frontend_event(event):
+    if event in _OBS_FRONTEND_EXIT_EVENTS:
+        _remove_widget_source()
+        _remove_update_timer()
+        _stop_tuna_poller_once()
+        _stop_palette_proxy_once()
+        _stop_wnp_once()
+        _unregister_frontend_callback()
+
+
+def _remove_update_timer():
+    global _timer_cleanup_done
+    if _timer_cleanup_done:
+        return
+    _timer_cleanup_done = True
+    try:
+        obs.timer_remove(update)
+    except Exception as exc:
+        print(f"WNP_TUNA - WARN: timer_remove failed: {exc}")
+
+
+def _stop_tuna_poller_once():
+    global _tuna_cleanup_done
+    if _tuna_cleanup_done:
+        return
+    _tuna_cleanup_done = True
+    stop_tuna_poller()
+
+
+def _stop_palette_proxy_once():
+    global _palette_cleanup_done
+    if _palette_cleanup_done:
+        return
+    _palette_cleanup_done = True
+    stop_palette_proxy()
+
+
+def _stop_wnp_once():
+    global _wnp_cleanup_done
+    if _wnp_cleanup_done:
+        return
+    _wnp_cleanup_done = True
+    try:
+        wnp_started = getattr(WNPRedux, "is_started", None)
+        if wnp_started is None or wnp_started:
+            print("WNP_TUNA - INFO: Stopping WNPRedux...")
+            WNPRedux.stop()
+            print("WNP_TUNA - INFO: WNPRedux stopped")
+    except Exception as exc:
+        print(f"WNP_TUNA - ERROR: WNPRedux.stop failed: {exc}")
+
+
+def _register_frontend_callback():
+    global _frontend_callback_registered
+    if _frontend_callback_registered:
+        return
+    obs.obs_frontend_add_event_callback(_on_frontend_event)
+    _frontend_callback_registered = True
+
+
+def _unregister_frontend_callback():
+    global _frontend_callback_registered
+    if not _frontend_callback_registered:
+        return
+    obs.obs_frontend_remove_event_callback(_on_frontend_event)
+    _frontend_callback_registered = False
+
+
+def _remove_widget_source():
+    global _widget_removed
+    if _widget_removed:
+        return
+    _widget_removed = True
+    source = obs.obs_get_source_by_name("WNP-Widget")
+    if not source:
+        return
+    try:
+        obs.obs_source_remove(source)
+    finally:
+        obs.obs_source_release(source)
 
 
 def load_local_widget_manifest():
@@ -237,6 +343,11 @@ def script_update(settings):
 
 
 def script_load(settings):
+    global _timer_cleanup_done, _tuna_cleanup_done, _palette_cleanup_done, _wnp_cleanup_done, _widget_removed
+    _timer_cleanup_done = _tuna_cleanup_done = _palette_cleanup_done = _wnp_cleanup_done = False
+    _widget_removed = False
+    _unregister_frontend_callback()
+
     def logger(level, message):
         print(f"WNP_TUNA - {level}: {message}")
 
@@ -244,15 +355,18 @@ def script_load(settings):
     start_tuna_poller()
     start_palette_proxy()
     obs.timer_add(update, 250)
+    _register_frontend_callback()
 
 
 def script_unload():
-    stop_thread = Thread(target=WNPRedux.stop, daemon=True)
-    stop_thread.start()
-    stop_thread.join(timeout=1)
-    stop_tuna_poller()
-    stop_palette_proxy()
-    obs.timer_remove(update)
+    print("WNP_TUNA - INFO: script_unload called")
+
+    _remove_widget_source()
+    _remove_update_timer()
+    _stop_tuna_poller_once()
+    _stop_palette_proxy_once()
+    _stop_wnp_once()
+    _unregister_frontend_callback()
 
 
 # ---------------------------------------------------------------------------
@@ -298,7 +412,12 @@ def stop_tuna_poller():
     global tuna_thread
     tuna_stop.set()
     if tuna_thread:
-        tuna_thread.join(timeout=1.5)
+        try:
+            tuna_thread.join(timeout=3.0)
+        except Exception as exc:
+            print(f"WNP_TUNA - WARN: error joining tuna poller thread: {exc}")
+        if tuna_thread.is_alive():
+            print("WNP_TUNA - WARN: tuna poller thread still alive after join")
     tuna_thread = None
 
 
