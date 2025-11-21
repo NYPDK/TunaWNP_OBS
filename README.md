@@ -4,9 +4,7 @@ Simple OBS integration to merge WebNowPlaying Redux data with a Tuna HTTP feed i
 
 ## Requirements
 - [OBS Studio](https://obsproject.com/) (to load the Python script and browser widget)
-- Python 3.9+ with the following packages installed in the same interpreter that OBS uses:
-  - `pywnp` (install via `pip install pywnp`)
-  - `obspython` is provided by OBS and does not need a separate install
+- Python 3.9+ (OBS 32.x.x should have Python 3.11 built in already)
 - WebNowPlaying Redux (2.0+) providing the WebSocket feed via the browser extension:
   - Chrome version: [WebNowPlaying Redux on the Chrome Web Store](https://chromewebstore.google.com/detail/webnowplaying/jfakgfcdgpghbbefmdfjkbdlibjgnbli)
   - Firefox version: [WebNowPlaying Redux on Mozilla Add-ons](https://addons.mozilla.org/en-US/firefox/addon/webnowplaying)
